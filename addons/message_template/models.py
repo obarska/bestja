@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from urlparse import urljoin
 
 from openerp import models, fields, api, tools
 from openerp.addons.email_template.email_template import mako_template_env
@@ -16,7 +17,7 @@ class MessageTemplate(models.Model):
         recipient_partners = []
         for recipient in recipients:
             recipient_partners.append(
-                (4, recipient.partner_id.id)
+                (4, recipient.sudo().partner_id.id)
             )
 
         subtype = None
@@ -24,21 +25,36 @@ class MessageTemplate(models.Model):
             sender = self.env.ref('message_template.user_messages')
             subtype = self.env.ref('message_template.subtype_system_message')
 
+        base_url = self.env['ir.config_parameter'].get_param('web.base.url')
+
+        def link_to(record):
+            """
+            Create an absolute link to the given record.
+            """
+            path = '/web#id={}&model={}'.format(record.id, record._name)
+            return urljoin(base_url, path)
+
         # Enable resolution of ${variables} inside body
-        body_template = mako_template_env.from_string(tools.ustr(self.body))
-        body_rendered = body_template.render({
+        template_context = {
             'record': record,
             'context': self.env.context,
-        })
+            'base_url': base_url,
+            'link_to': link_to,
+            'site_name': self.env.user.company_id.name,
+        }
+        body_template = mako_template_env.from_string(tools.ustr(self.body))
+        body_rendered = body_template.render(template_context)
+        subject_template = mako_template_env.from_string(tools.ustr(self.subject))
+        subject_rendered = subject_template.render(template_context)
 
         self.env['mail.message'].sudo().create({
             'type': 'comment',
-            'author_id': sender.partner_id.id,
+            'author_id': sender.sudo().partner_id.id,
             'partner_ids': recipient_partners,
             'model': self.model,
             'res_id': record and record.id,
             'record_name': record_name or (record and record.display_name),
-            'subject': self.subject,
+            'subject': subject_rendered,
             'body': body_rendered,
             'template': self.id,
             'subtype_id': subtype and subtype.id
@@ -51,7 +67,7 @@ class MessageTemplate(models.Model):
         """
         group_obj = self.env.ref(group)
         self.send(
-            recipients=group_obj.users,
+            recipients=group_obj.sudo().users,
             sender=sender,
             record=record,
             record_name=record_name,
@@ -101,12 +117,18 @@ class MessageTemplateMixin(models.AbstractModel):
         """
         return self.env['mail.thread'].message_redirect_action()
 
-    @api.multi
     def message_post(self, *args, **kwargs):
         """
         Used by the messages module to reply in a thread.
         """
-        return self.env['mail.thread'].message_post(*args, **kwargs)
+        return self.pool['mail.thread'].message_post(*args, **kwargs)
+
+    @api.model
+    def _get_access_link(self, mail, partner):
+        """
+        Used to generate a link to the associated object in e-mail notification.
+        """
+        return self.env['mail.thread']._get_access_link(mail, partner)
 
 
 class MailMessage(models.Model):

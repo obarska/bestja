@@ -1,0 +1,40 @@
+<openerp>
+    <data>
+        <record model="ir.actions.act_window" id="create_account_deletion_wizard">
+            <field name="name">Czy na pewno chcesz usunąć konto?</field>
+            <field name="res_model">bestja.report_account_deletion_wizard</field>
+            <field name="view_mode">form</field>
+            <field name="target">new</field>
+        </record>
+
+        <!-- Adding Delete Account in Volunteer Preferences -->
+        <record model="ir.ui.view" id="bestja_volunteer_form_deletion">
+            <field name="name">bestja.volunteer.delete_account</field>
+            <field name="model">res.users</field>
+            <field name="inherit_id" ref="bestja_volunteer.bestja_volunteer_form"/>
+            <field name="arch" type="xml">
+                <field name='notify_email' position="after">
+                    <separator string="Usuwanie konta"/>
+                    <div class="oe_edit_only oe_grey">Utracisz wszystkie dane i nie będziesz mógł ich przywrócić.</div>
+                    <button name="%(create_account_deletion_wizard)d" type="action" string="Usuń konto" class="oe_link"/>
+                 </field>
+            </field>
+        </record>
+
+        <record model="ir.ui.view" id="report_account_deletion_wizard_form">
+            <field name="name">bestja.report_account_deletion.wizard</field>
+            <field name="model">bestja.report_account_deletion_wizard</field>
+            <field name="arch" type="xml">
+                <form>
+                    <label for="reason"/><br/>
+                    <field name="reason" class="medium_input"/>
+                    <field name="reason_description" class="medium_input" attrs="{'invisible': [('reason', '!=', 'else')]}"/>
+                    <footer>
+                        <button name="report_delete_account" type="object" string="Tak, na pewno chcę usunąć" class="oe_highlight"/>
+                        <button special="cancel" string="Nie usuwaj" class="oe_link"/>
+                    </footer>
+                </form>
+            </field>
+        </record>
+    </data>
+</openerp>

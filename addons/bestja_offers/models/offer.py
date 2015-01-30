@@ -6,8 +6,6 @@ from datetime import date
 from openerp import tools, models, fields, api, exceptions
 from openerp.addons.website.models.website import slug
 
-from ..search import OffersIndex
-
 
 class Weekday(models.Model):
     _name = 'offers.weekday'
@@ -24,6 +22,7 @@ class HelpeeGroup(models.Model):
 class Offer(models.Model):
     _name = 'offer'
     _inherit = ['message_template.mixin']
+    _order = 'id desc'
     STATES = [
         ('unpublished', "nieopublikowana"),
         ('published', "opublikowana"),
@@ -56,14 +55,6 @@ class Offer(models.Model):
     def _default_helpee_group(self):
         return self.env['offers.helpee_group'].search([])
 
-    @api.multi
-    def compute_image_medium(self):
-        self.image_medium = tools.image_resize_image_medium(self.image)
-
-    @api.one
-    def inverse_image_medium(self):
-        self.image = tools.image_resize_image_big(self.image_medium)
-
     state = fields.Selection(STATES, default='unpublished', string="Stan")
     name = fields.Char(string="Nazwa")
     vacancies = fields.Integer(string="Liczba wakatów", requred=True, default=1)
@@ -71,7 +62,11 @@ class Offer(models.Model):
         'bestja.project',
         string="Projekt",
         required=True,
-        domain=lambda self: [('organization.id', '=', self.env.user.coordinated_org.id)]
+        domain=lambda self: [
+            '|',
+            ('organization.id', '=', self.env.user.coordinated_org.id),
+            ('manager.id', '=', self.env.user.id),
+        ]
     )
     organization = fields.Many2one(
         'organization',
@@ -132,14 +127,12 @@ class Offer(models.Model):
     desc_comments = fields.Text(
         string="Uwagi"
     )
-    image = fields.Binary()
-    image_medium = fields.Binary(compute='compute_image_medium', inverse='inverse_image_medium', store=True)
     date_end = fields.Date(string="Termin ważności")
     remaining_days = fields.Integer(string="Wygasa za", compute='_remaining_days')
     kind = fields.Selection(KIND_CHOICES, required=True, string="rodzaj akcji")
     interval = fields.Selection(INTERVAL_CHOICES, string="powtarzaj co")
     daypart = fields.Many2many('volunteer.daypart', string="pora dnia")
-    hours = fields.Integer(string="liczba h")
+    hours = fields.Integer(string="liczba h/tyg.")
     weekday = fields.Many2many('offers.weekday', string="dzień tygodnia")
     comments_time = fields.Text(string="Uwagi dotyczące terminu")
     applications = fields.One2many('offers.application', 'offer', string="Aplikacje")
@@ -173,11 +166,9 @@ class Offer(models.Model):
             raise exceptions.ValidationError("Liczba wakatów musi być większa od 0!")
 
     @api.one
-    @api.constrains('kind', 'hours', 'weekday', 'daypart', 'interval')
+    @api.constrains('kind', 'weekday', 'daypart', 'interval')
     def _check_time(self):
         if not self.kind == 'flexible':
-            if not self.hours:
-                raise exceptions.ValidationError("Wypełnij pole liczby godzin!")
             if not self.weekday:
                 raise exceptions.ValidationError("Wypełnij pole dnia tygodnia!")
             if not self.daypart:
@@ -299,57 +290,6 @@ class Offer(models.Model):
 
         view['arch'] = etree.tostring(doc)
         return view
-
-    # Whoosh indexing section starts here
-    @api.multi
-    def whoosh_reindex(self):
-        """
-        Update/Add offers to the whoosh index.
-        """
-        # utility function for creating lists of names of objects
-        # in a record set
-        list_names = lambda rset: [r[1] for r in rset.name_get()]
-
-        index = OffersIndex(dbname=self.env.cr.dbname)
-        writer = index.get_writer()
-        for offer in self.sudo():
-            pk = unicode(offer.id)
-            if offer.state == 'published':
-                writer.update_document(
-                    pk=pk,
-                    slug=slug(self),
-                    name=offer.name,
-                    wishes=list_names(offer.wishes),
-                    target_group=list_names(offer.target_group),
-                    organization=self.organization.name,
-                )
-            else:
-                # Should not be public. Flag as removed from index.
-                # Even if it wasn't there - no harm, no foul.
-                writer.delete_by_term('pk', pk)
-        writer.commit()
-
-    @api.model
-    def create(self, vals):
-        record = super(Offer, self).create(vals)
-        record.whoosh_reindex()
-        return record
-
-    @api.multi
-    def write(self, vals):
-        val = super(Offer, self).write(vals)
-        self.whoosh_reindex()
-        return val
-
-    @api.multi
-    def unlink(self):
-        val = super(Offer, self).unlink()
-        index = OffersIndex(dbname=self.env.cr.dbname)
-        writer = index.get_writer()
-        for offer in self:
-            writer.delete_by_term('pk', unicode(offer.id))
-        writer.commit()
-        return val
 
     @api.multi
     def read(self, fields=None, load='_classic_read'):

@@ -8,19 +8,14 @@
             ]]></field>
             <field name="model">organization</field>
         </record>
-
         <record id="msg_registered_admin" model="message_template">
-            <field name="subject">Organizacja czeka na Twoją akceptację</field>
+            <field name="subject">Nowa organizacja czeka na akceptację</field>
             <field name="body"><![CDATA[
-                Zobacz szczegóły i skontaktuj się z organizacją w ciągu 7 dni. <br/><br/>
-                Dane organizacji:<br/>
-                <strong>Nazwa:</strong> ${record.name}<br/>
-                <strong>Koordynator:</strong> ${record.coordinator.name}<br/>
-                <strong>Telefon:</strong> ${record.phone}
+<p>Zgłosiła się nowa organizacja ${link_to(record)}, która oczekuje na akceptację.</p>
+<p>Przejdź do jej profilu i podejmij decyzję o jej przyjęciu lub odrzuceniu zgłoszenia.</p>]] 
             ]]></field>
             <field name="model">organization</field>
         </record>
-
         <record id="msg_rejected" model="message_template">
             <field name="subject">Rejestracja organizacji nie przebiegła pomyślnie</field>
             <field name="body"><![CDATA[
@@ -28,17 +23,16 @@
             ]]></field>
             <field name="model">organization</field>
         </record>
-
         <record id="msg_approved" model="message_template">
             <field name="subject">Twoja organizacja została zaakceptowana!</field>
             <field name="body"><![CDATA[
                 Dzięki Twojej aktywności Twoja organizacja dołączyła do naszej społeczności!
-
                 <ul>
                     <li><a href="#">Przeczytaj poradnik, jak tworzyć ciekawe oferty</a></li>
                     <li><a href="#id=${record.id}&view_type=form&model=organization">Uzupełnij profil organizacji</a></li>
                     Dodaj swój pierwszy projekt!
                 </ul>
+                <li><a href="${link_to(record)}">Uzupełnij profil organizacji</a></li>
             ]]></field>
             <field name="model">organization</field>
         </record>

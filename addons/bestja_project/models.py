@@ -5,6 +5,7 @@ from openerp import models, fields, api, exceptions
 class Project(models.Model):
     _name = 'bestja.project'
     _inherit = ['message_template.mixin']
+    _order = 'id desc'
 
     def current_members(self):
         """
@@ -239,6 +240,11 @@ class UserWithProjects(models.Model):
         inverse_name='manager'
     )
 
+    def __init__(self, pool, cr):
+        super(UserWithProjects, self).__init__(pool, cr)
+        self.add_permitted_fields(level='owner', fields={'projects', 'managed_projects'})
+        self.add_permitted_fields(level='privileged', fields={'projects', 'managed_projects'})
+
     @api.one
     def sync_manager_groups(self):
         """
@@ -249,6 +255,18 @@ class UserWithProjects(models.Model):
             group=self.env.ref('bestja_project.managers'),
             domain=[('managed_projects', '!=', False)],
         )
+
+        @api.one
+        @api.depends('projects')
+        def compute_user_access_level(self):
+            """
+            Access level that the current (logged in) user has for the object.
+            Either "owner", "admin", "privileged" or None.
+            """
+            super(UserWithProjects, self).compute_user_access_level()
+            if not self.user_access_level and self.user_has_groups('bestja_project.managers') \
+                    and (self.env.user.managed_projects & self.sudo().projects):
+                self.user_access_level = 'privileged'
 
 
 class OrganizationWithProjects(models.Model):

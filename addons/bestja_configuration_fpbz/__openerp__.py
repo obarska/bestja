@@ -12,15 +12,20 @@
         'bestja_base',
         'bestja_volunteer',
         'bestja_volunteer_notes',
+        'bestja_account_deletion',
         'bestja_organization',
         'bestja_organization_hierarchy',
         'bestja_project',
         'bestja_project_hierarchy',
+        'bestja_requests',
         'bestja_offers',
+        'bestja_offers_by_org',
         'bestja_files',
-        'email_confirmation',
         'quizzes',
         'bestja_organization_warehouse'
+    ],
+    'data': [
+        'data.xml',
     ],
     'application': True,
 }
